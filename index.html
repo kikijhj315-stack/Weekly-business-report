@@ -115,10 +115,10 @@
       <!-- Left Panel -->
       <section class="control-panel">
 
-        <!-- Step 1: 파일 업로드 (5개) -->
+        <!-- Step 1: 파일 업로드 (6개) -->
         <div class="panel-card upload-section">
           <h2 class="section-title"><span class="step-num">1</span> 엑셀 파일 업로드</h2>
-          <div class="upload-grid" style="grid-template-columns: repeat(5, 1fr);">
+          <div class="upload-grid" style="grid-template-columns: repeat(6, 1fr);">
             <!-- 원본데이터 -->
             <div class="upload-box" id="drop-raw">
               <input type="file" id="file-raw" accept=".xlsx" class="file-input">
@@ -155,9 +155,17 @@
             <div class="upload-box" id="drop-coupang">
               <input type="file" id="file-coupang" accept=".xlsx" class="file-input">
               <i data-lucide="rocket" class="upload-icon" style="color: #FF5A5F;"></i>
-              <h3>쿠팡로켓 (선택)</h3>
+              <h3>쿠팡로켓</h3>
               <p class="file-desc">쿠팡로켓.xlsx</p>
               <div class="file-status" id="status-coupang">대기 중...</div>
+            </div>
+            <!-- 재고 (선택) -->
+            <div class="upload-box" id="drop-inventory">
+              <input type="file" id="file-inventory" accept=".xlsx" class="file-input">
+              <i data-lucide="package" class="upload-icon" style="color: #4CAF50;"></i>
+              <h3>재고 (선택)</h3>
+              <p class="file-desc">재고.xlsx</p>
+              <div class="file-status" id="status-inventory">대기 중...</div>
             </div>
           </div>
         </div>
@@ -319,7 +327,7 @@
     const loadingOverlay  = document.getElementById('loading-overlay');
     const loadingText     = document.getElementById('loading-text');
     const clientChipArea  = document.getElementById('client-chip-area');
-    const categoryChipArea = document.getElementById('category-chip-area'); // 카테고리 칩 영역
+    const categoryChipArea = document.getElementById('category-chip-area');
 
     let generatedResult = null;
 
@@ -335,7 +343,8 @@
       { dropId: 'drop-top',        inputId: 'file-top',        statusId: 'status-top',        key: 'topSales' },
       { dropId: 'drop-master',     inputId: 'file-master',     statusId: 'status-master',     key: 'productMaster' },
       { dropId: 'drop-managermap', inputId: 'file-managermap', statusId: 'status-managermap', key: 'managerMap' },
-      { dropId: 'drop-coupang',    inputId: 'file-coupang',    statusId: 'status-coupang',    key: 'coupang' }
+      { dropId: 'drop-coupang',    inputId: 'file-coupang',    statusId: 'status-coupang',    key: 'coupang' },
+      { dropId: 'drop-inventory',  inputId: 'file-inventory',  statusId: 'status-inventory',  key: 'inventory' }
     ];
 
     fileConfigs.forEach(cfg => {
@@ -642,8 +651,10 @@
         downloadBlob(mmBuf, '담당자매출처.xlsx');
         const cpBuf = await generateSampleCoupang();
         downloadBlob(cpBuf, '쿠팡로켓.xlsx');
+        const invBuf = await generateSampleInventory();
+        downloadBlob(invBuf, '재고.xlsx');
         hideLoading();
-        alert('샘플 파일 5종이 다운로드되었습니다.\n\n• 원본데이터.xlsx\n• 매출TOP.xlsx\n• Product_Master.xlsx\n• 담당자매출처.xlsx\n• 쿠팡로켓.xlsx\n\n업로드하여 테스트해보세요!');
+        alert('샘플 파일 6종이 다운로드되었습니다.\n\n• 원본데이터.xlsx\n• 매출TOP.xlsx\n• Product_Master.xlsx\n• 담당자매출처.xlsx\n• 쿠팡로켓.xlsx\n• 재고.xlsx\n\n업로드하여 테스트해보세요!');
       } catch (e) {
         hideLoading();
         alert('샘플 생성 에러: ' + e.message);
