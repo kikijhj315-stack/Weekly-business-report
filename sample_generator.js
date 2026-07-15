@@ -196,3 +196,62 @@ async function generateSampleProductMaster() {
 
   return await workbook.xlsx.writeBuffer();
 }
+
+async function generateSampleInventory() {
+  const workbook = new ExcelJS.Workbook();
+  const sheet    = workbook.addWorksheet('재고');
+
+  // A열(1) ~ J열(10)
+  sheet.columns = [
+    { header: '모델명', key: 'model', width: 20 },
+    { header: 'B', key: 'b', width: 5 },
+    { header: 'C', key: 'c', width: 5 },
+    { header: 'D', key: 'd', width: 5 },
+    { header: 'E', key: 'e', width: 5 },
+    { header: 'F', key: 'f', width: 5 },
+    { header: 'G', key: 'g', width: 5 },
+    { header: 'H', key: 'h', width: 5 },
+    { header: 'I', key: 'i', width: 5 },
+    { header: '가용재고', key: 'stock', width: 12 }
+  ];
+
+  const invData = [
+    { model: 'TM-MUA01-WHT', stock: 150 },
+    { model: 'TM-MUA01-BLK', stock: 50 },
+    { model: 'TM-MUA02-BLK', stock: 80 },
+    { model: 'TM-MUA05-BLU', stock: 300 },
+    { model: 'TM-MUA10-BLK', stock: 0 },
+    { model: 'TM-MUA20-RED', stock: 10 } // 안 팔린 모델 재고 테스트
+  ];
+
+  sheet.getRow(1).font = { bold: true };
+  invData.forEach(d => {
+    sheet.addRow({ model: d.model, stock: d.stock });
+  });
+
+  return await workbook.xlsx.writeBuffer();
+}
+
+// 브라우저에서 접근할 수 있도록 전역 객체에 할당
+window.generateSampleFiles = async function() {
+  try {
+    const rawDataBuf       = await generateSampleRawData();
+    const topSalesBuf      = await generateSampleTopSales();
+    const masterBuf        = await generateSampleProductMaster();
+    const clientMapBuf     = await generateSampleClientMap();
+    const coupangBuf       = await generateSampleCoupang();
+    const inventoryBuf     = await generateSampleInventory();
+
+    return {
+      rawData: rawDataBuf,
+      topSales: topSalesBuf,
+      productMaster: masterBuf,
+      clientMap: clientMapBuf,
+      coupang: coupangBuf,
+      inventory: inventoryBuf
+    };
+  } catch (err) {
+    console.error('샘플 파일 생성 실패:', err);
+    throw err;
+  }
+};

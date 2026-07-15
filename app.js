@@ -162,7 +162,8 @@ let uploadedData = {
   rawData:       null,
   topSales:      null,
   productMaster: null,
-  coupang:       null
+  coupang:       null,
+  inventory:     null
 };
 
 // ──────────────────────────────────────────────
@@ -217,9 +218,16 @@ async function processFilesAndGenerate({ startDate, endDate, managerName, select
   const masterWorkbook = new ExcelJS.Workbook();
   await masterWorkbook.xlsx.load(uploadedData.productMaster.slice(0));
 
+  let inventoryWorkbook = null;
+  if (uploadedData.inventory) {
+    inventoryWorkbook = new ExcelJS.Workbook();
+    await inventoryWorkbook.xlsx.load(uploadedData.inventory.slice(0));
+  }
+
   const rawSheet    = rawWorkbook.worksheets[0];
   const topSheet    = topWorkbook.worksheets[0];
   const masterSheet = masterWorkbook.worksheets[0];
+  const inventorySheet = inventoryWorkbook ? inventoryWorkbook.worksheets[0] : null;
 
   if (!rawSheet || !topSheet || !masterSheet) {
     throw new Error('업로드된 파일의 시트를 읽을 수 없습니다.');
@@ -247,26 +255,59 @@ async function processFilesAndGenerate({ startDate, endDate, managerName, select
   const pmCatCol         = 6; // F열: 국내분류
   const pmModelGroupCol  = 7; // G열: 모델그룹
 
+  // 재고 파일
+  const invModelCol = 1; // A열
+  const invStockCol = 10; // J열 (가용재고)
+
   console.log('[DEBUG] 열 매핑 →', { rawClientCol, rawDateCol, rawStatusCol, rawQtyCol, rawAmountCol, rawOrderCol });
   console.log('[DEBUG] TOP 열 →', { topClientCol, topModelGroupCol, topQtyCol, topAmountCol });
   console.log('[DEBUG] Master 열 →', { pmCatCol, pmModelGroupCol });
 
   // ── 3. Product_Master 파싱 ──
   const productCategoryMap = {}; // 모델그룹명(하이픈 이후 텍스트) → 국내분류
+  const categoryToModelsMap = {}; // 국내분류 → 모든 모델그룹명(set) (판매량 0인 것도 포함하기 위함)
   masterSheet.eachRow((row, rowNum) => {
     if (rowNum === 1) return;
     let modelGroup = String(getCellValue(row.getCell(pmModelGroupCol))).trim();
     const cat      = String(getCellValue(row.getCell(pmCatCol))).trim();
     if (modelGroup && cat) {
-      // 하이픈(-) 앞의 텍스트와 하이픈 제거 (예: TM-MUA05 -> MUA05)
       const dashIdx = modelGroup.indexOf('-');
       if (dashIdx !== -1) {
         modelGroup = modelGroup.substring(dashIdx + 1).trim();
       }
       productCategoryMap[modelGroup] = cat;
+      if (!categoryToModelsMap[cat]) categoryToModelsMap[cat] = new Set();
+      categoryToModelsMap[cat].add(modelGroup);
     }
   });
-  console.log('[DEBUG] Product_Master 모델수:', Object.keys(productCategoryMap).length);
+
+  // ── 3.5. 재고 파일 파싱 ──
+  const inventoryMap = {}; // 모델그룹명 → 가용재고
+  if (inventorySheet) {
+    inventorySheet.eachRow((row, rowNum) => {
+      if (rowNum === 1) return; // 헤더 제외
+      let model = String(getCellValue(row.getCell(invModelCol))).trim();
+      const stock = parseFloat(getCellValue(row.getCell(invStockCol))) || 0;
+      
+      if (model) {
+        // TM-MUA05-WHT → prefix 지우기
+        const firstDash = model.indexOf('-');
+        if (firstDash !== -1) {
+          model = model.substring(firstDash + 1).trim(); // MUA05-WHT
+        }
+        // color 지우기
+        const secondDash = model.indexOf('-');
+        if (secondDash !== -1) {
+          model = model.substring(0, secondDash).trim(); // MUA05
+        }
+        if (model) {
+          if (!inventoryMap[model]) inventoryMap[model] = 0;
+          inventoryMap[model] += stock;
+        }
+      }
+    });
+    console.log('[DEBUG] 재고 데이터:', inventoryMap);
+  }
 
   // ── 4. 원본데이터 파싱 (시트1) ──
   const start = new Date(startDate); start.setHours(0, 0, 0, 0);
@@ -418,7 +459,6 @@ async function processFilesAndGenerate({ startDate, endDate, managerName, select
 
   categoriesToBuild.forEach(targetCat => {
     const sheetClientMap = {}; 
-    const pivotModelGroupsSet = new Set();
     const modelGroupTotalQty = {}; // 모델그룹별 총 수량 (열 내림차순 정렬용)
 
     parsedTopSales.forEach(row => {
@@ -435,8 +475,6 @@ async function processFilesAndGenerate({ startDate, endDate, managerName, select
       }
       sheetClientMap[row.client].models[row.modelGroup] += row.qty;
       
-      pivotModelGroupsSet.add(row.modelGroup);
-      
       if (!modelGroupTotalQty[row.modelGroup]) modelGroupTotalQty[row.modelGroup] = 0;
       modelGroupTotalQty[row.modelGroup] += row.qty;
     });
@@ -451,11 +489,30 @@ async function processFilesAndGenerate({ startDate, endDate, managerName, select
     // 행 정렬 (매출처별 수량 내림차순)
     sheet2Data.sort((a, b) => b.qty - a.qty);
 
-    // 열 정렬 (모델그룹 전체 합계 수량 내림차순)
-    const pivotModelGroups = Array.from(pivotModelGroupsSet);
-    pivotModelGroups.sort((a, b) => modelGroupTotalQty[b] - modelGroupTotalQty[a]);
+    // 열 정렬: 해당 카테고리의 모든 모델(미판매 포함)을 가져온 뒤 정렬
+    // '전체'일 경우 ProductMaster의 모든 카테고리에 속한 모든 모델을 합침
+    let allModelsForCat = [];
+    if (targetCat === '전체') {
+      Object.values(categoryToModelsMap).forEach(set => {
+        set.forEach(m => allModelsForCat.push(m));
+      });
+      allModelsForCat = Array.from(new Set(allModelsForCat));
+    } else {
+      allModelsForCat = categoryToModelsMap[targetCat] ? Array.from(categoryToModelsMap[targetCat]) : [];
+    }
 
-    buildSheet2(wb, { sheet2Data, targetCat, pivotModelGroups });
+    // 모델그룹 전체 합계 수량 내림차순, 수량이 같으면(또는 0이면) 이름순 등 처리
+    const pivotModelGroups = allModelsForCat;
+    pivotModelGroups.sort((a, b) => {
+      const qtyA = modelGroupTotalQty[a] || 0;
+      const qtyB = modelGroupTotalQty[b] || 0;
+      if (qtyB !== qtyA) {
+        return qtyB - qtyA; // 내림차순
+      }
+      return a.localeCompare(b); // 판매량 0인 미판매 모델들끼리는 알파벳순 정렬
+    });
+
+    buildSheet2(wb, { sheet2Data, targetCat, pivotModelGroups, inventoryMap });
   });
 
   const buffer = await wb.xlsx.writeBuffer();
@@ -470,7 +527,7 @@ function buildSheet1(wb, { startDate, endDate, managerName, sheet1Rows }) {
   const ws = wb.addWorksheet('주간 영업보고');
   ws.views = [{ zoomScale: 90 }]; // 화면 보기 확대/축소 90%
 
-  // 열 너비
+  // 열 너비 (A~F 와 G~L 동일하게 설정)
   ws.columns = [
     { width: 22 }, // A: 매출처
     { width: 15 }, // B: 주문건수
@@ -478,6 +535,12 @@ function buildSheet1(wb, { startDate, endDate, managerName, sheet1Rows }) {
     { width: 22 }, // D: 매출금액
     { width: 15 }, // E: 평균판가
     { width: 40 }, // F: 영업내용
+    { width: 22 }, // G
+    { width: 15 }, // H
+    { width: 15 }, // I
+    { width: 22 }, // J
+    { width: 15 }, // K
+    { width: 40 }, // L
   ];
 
   const numFmt = '#,##0';
@@ -570,7 +633,7 @@ function buildSheet1(wb, { startDate, endDate, managerName, sheet1Rows }) {
 // ──────────────────────────────────────────────
 // 시트2: 카테고리별 판매현황
 // ──────────────────────────────────────────────
-function buildSheet2(wb, { sheet2Data, targetCat, pivotModelGroups }) {
+function buildSheet2(wb, { sheet2Data, targetCat, pivotModelGroups, inventoryMap }) {
   const sheetName = targetCat === '전체' ? '판매현황' : `${targetCat} 판매현황`;
   // 시트 이름이 이미 존재할 경우 처리 (예: 동일 이름 중복)
   let ws;
@@ -648,14 +711,14 @@ function buildSheet2(wb, { sheet2Data, targetCat, pivotModelGroups }) {
   const pivotStartCol = 7; // G열
 
   if (pivotModelGroups && pivotModelGroups.length > 0) {
-    // 1행 제목 (병합 해제, 단독 셀 G1에 작성)
+    // 1행: 가용재고 라벨 및 재고 수량
     applyCell(ws.getRow(1).getCell(pivotStartCol), {
-      value: '모델그룹별 판매수량', bold: true, fontSize: 16,
+      value: '가용재고', bold: true, fontSize: 10,
       fontColor: COLORS.titleFont, bgColor: COLORS.titleBg,
       hAlign: 'center', border: true
     });
 
-    // 2행 헤더
+    // 2행 헤더 (매출처별)
     applyCell(ws.getRow(2).getCell(pivotStartCol), {
       value: '매출처별', bold: true, fontSize: 10,
       fontColor: COLORS.headerFont, bgColor: COLORS.headerBg,
@@ -663,8 +726,19 @@ function buildSheet2(wb, { sheet2Data, targetCat, pivotModelGroups }) {
     });
     ws.getColumn(pivotStartCol).width = 24;
 
+    // 1~2행 모델별 값 및 타이틀 채우기
     pivotModelGroups.forEach((modelGroup, idx) => {
       const colIdx = pivotStartCol + 1 + idx;
+      
+      // 1행: 재고 수량
+      const stockVal = inventoryMap[modelGroup] || 0;
+      applyCell(ws.getRow(1).getCell(colIdx), {
+        value: stockVal > 0 ? stockVal : '', bold: true, fontSize: 10,
+        fontColor: COLORS.titleFont, bgColor: COLORS.titleBg,
+        hAlign: 'center', border: true, numFmt: '#,##0'
+      });
+
+      // 2행: 모델명
       applyCell(ws.getRow(2).getCell(colIdx), {
         value: modelGroup, bold: true, fontSize: 10,
         fontColor: COLORS.headerFont, bgColor: COLORS.headerBg,

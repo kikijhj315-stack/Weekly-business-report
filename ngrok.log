@@ -1,0 +1,29 @@
+t=2026-07-09T10:58:19+0900 lvl=info msg="no configuration paths supplied"
+t=2026-07-09T10:58:19+0900 lvl=info msg="using configuration at default config path" path=C:\\Users\\한승우\\AppData\\Local\\ngrok\\ngrok.yml
+t=2026-07-09T10:58:19+0900 lvl=info msg="open config file" path=C:\\Users\\한승우\\AppData\\Local\\ngrok\\ngrok.yml err=nil
+t=2026-07-09T10:58:19+0900 lvl=info msg="FIPS 140 mode" enabled=false
+t=2026-07-09T10:58:19+0900 lvl=info msg="starting web service" obj=web addr=127.0.0.1:4040 allow_hosts=[]
+t=2026-07-09T10:58:20+0900 lvl=info msg="client session established" obj=tunnels.session
+t=2026-07-09T10:58:20+0900 lvl=info msg="tunnel session started" obj=tunnels.session
+t=2026-07-09T10:58:20+0900 lvl=info msg="started tunnel" obj=tunnels name=command_line addr=http://localhost:8080 url=https://trembling-polka-compile.ngrok-free.dev
+t=2026-07-09T10:59:02+0900 lvl=info msg="join connections" obj=join id=83e35abe805f l=127.0.0.1:8080 r=106.251.229.154:54585
+t=2026-07-09T10:59:03+0900 lvl=info msg="join connections" obj=join id=094b038483cc l=127.0.0.1:8080 r=106.251.229.154:54585
+t=2026-07-09T10:59:03+0900 lvl=info msg="join connections" obj=join id=847c339c290d l=127.0.0.1:8080 r=106.251.229.154:54585
+t=2026-07-09T10:59:03+0900 lvl=info msg="join connections" obj=join id=dd86c1ed50b1 l=127.0.0.1:8080 r=106.251.229.154:54585
+t=2026-07-09T10:59:03+0900 lvl=info msg="join connections" obj=join id=550fa6026e06 l=127.0.0.1:8080 r=106.251.229.154:54585
+t=2026-07-09T11:26:45+0900 lvl=eror msg="heartbeat timeout, terminating session" obj=tunnels.session obj=csess id=181ca891a195 clientid=351f402fdd60845ae02456bd42dbf5c3
+t=2026-07-09T11:26:45+0900 lvl=eror msg="session closed, starting reconnect loop" obj=tunnels.session obj=csess id=4c6bff09fdb7 err="session closed"
+t=2026-07-09T11:26:45+0900 lvl=eror msg="failed to reconnect session" obj=tunnels.session err="failed to dial ngrok server with address \"connect.ngrok-agent.com:443\": dial tcp: lookup connect.ngrok-agent.com: no such host"
+t=2026-07-09T11:26:45+0900 lvl=eror msg="failed to reconnect session" obj=tunnels.session err="failed to dial ngrok server with address \"connect.ngrok-agent.com:443\": dial tcp: lookup connect.ngrok-agent.com: no such host"
+t=2026-07-09T11:26:46+0900 lvl=eror msg="failed to reconnect session" obj=tunnels.session err="failed to dial ngrok server with address \"connect.ngrok-agent.com:443\": dial tcp: lookup connect.ngrok-agent.com: no such host"
+t=2026-07-09T11:26:48+0900 lvl=eror msg="failed to reconnect session" obj=tunnels.session err="failed to dial ngrok server with address \"connect.ngrok-agent.com:443\": dial tcp: lookup connect.ngrok-agent.com: no such host"
+t=2026-07-09T11:26:53+0900 lvl=info msg="client session established" obj=tunnels.session
+t=2026-07-09T11:26:53+0900 lvl=info msg="tunnel session started" obj=tunnels.session
+t=2026-07-09T12:00:36+0900 lvl=info msg="join connections" obj=join id=80e978016a20 l=127.0.0.1:8080 r=66.249.77.34:46328
+t=2026-07-09T12:00:36+0900 lvl=info msg="join connections" obj=join id=cb757ec13472 l=127.0.0.1:8080 r=74.125.218.37:43958
+t=2026-07-09T12:01:04+0900 lvl=info msg="join connections" obj=join id=735f94ae3057 l=127.0.0.1:8080 r=74.125.218.32:35691
+t=2026-07-09T12:01:04+0900 lvl=info msg="join connections" obj=join id=bba742ea2532 l=127.0.0.1:8080 r=74.125.218.35:42906
+t=2026-07-09T12:01:05+0900 lvl=info msg="join connections" obj=join id=f2f4727289d1 l=127.0.0.1:8080 r=74.125.218.35:42906
+t=2026-07-09T17:04:22+0900 lvl=info msg="received stop request" obj=app stopReq="{err:<nil> restart:false}"
+t=2026-07-09T17:04:22+0900 lvl=info msg="session closing" obj=tunnels.session err=nil
+t=2026-07-09T17:04:22+0900 lvl=info msg="accept failed" obj=tunnels.session obj=csess id=4c6bff09fdb7 err="reconnecting session closed"
