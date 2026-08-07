@@ -170,17 +170,17 @@ let uploadedData = {
 // 스타일 헬퍼
 // ──────────────────────────────────────────────
 const COLORS = {
-  titleBg:     'FF1E1B4B',  // 짙은 남색
+  titleBg:     'FF3A3A3A',  // 어두운 회색 (기존 남색 대체)
   titleFont:   'FFFFFFFF',
-  headerBg:    'FF2D2B8E',  // 보라 계열
+  headerBg:    'FF555555',  // 중간 회색 (기존 보라 대체)
   headerFont:  'FFFFFFFF',
-  subHeaderBg: 'FF4A4890',
+  subHeaderBg: 'FF777777',  // 밝은 회색
   subHeaderFont: 'FFFFFFFF',
-  rowEven:     'FFF0EFFF',
-  rowOdd:      'FFFFFFFF',
-  catBg:       'FFEDE9FE',  // 연보라
-  border:      'FFCCCCCC',
-  numFont:     'FF1A237E',
+  rowEven:     'FFF5F5F5',  // 아주 밝은 회색 배경
+  rowOdd:      'FFFFFFFF',  // 흰색 배경
+  catBg:       'FFEEEEEE',  // 연회색
+  border:      'FFCCCCCC',  // 테두리 회색
+  numFont:     'FF000000',  // 숫자 폰트 검정색 (기존 파란색 대체)
 };
 
 function borderStyle(color = COLORS.border) {
@@ -611,7 +611,7 @@ function buildSheet1(wb, { startDate, endDate, managerName, sheet1Rows }) {
   const totalAmount   = sheet1Rows.reduce((s, r) => s + r.amount, 0);
   const totalAvg      = totalQty > 0 ? Math.round(totalAmount / totalQty) : 0;
 
-  const totalBg = 'FF2D2B8E'; // 헤더와 같은 보라 배경
+  const totalBg = 'FF555555'; // 헤더와 같은 중간 회색 배경
   const tr = ws.getRow(totalRowNum);
   applyCell(tr.getCell(1), { value: '합  계', bold: true, fontSize: 18, bgColor: totalBg, fontColor: COLORS.headerFont, hAlign: 'center', border: true });
   applyCell(tr.getCell(2), { value: totalOrderCnt, bold: true, fontSize: 18, bgColor: totalBg, fontColor: COLORS.headerFont, hAlign: 'center', border: true, numFmt });
@@ -700,7 +700,7 @@ function buildSheet2(wb, { sheet2Data, targetCat, pivotModelGroups, inventoryMap
   const totalQty = sheet2Data.reduce((s, r) => s + r.qty, 0);
   const totalAmount = sheet2Data.reduce((s, r) => s + r.amount, 0);
 
-  const totalBg = 'FF2D2B8E';
+  const totalBg = 'FF555555';
   const tr = ws.getRow(currentRow);
   applyCell(tr.getCell(1), { value: '합  계', bold: true, fontSize: 10, bgColor: totalBg, fontColor: COLORS.headerFont, hAlign: 'center', border: true });
   applyCell(tr.getCell(2), { value: totalQty, bold: true, fontSize: 10, bgColor: totalBg, fontColor: COLORS.headerFont, hAlign: 'right', border: true, numFmt });
@@ -772,7 +772,7 @@ function buildSheet2(wb, { sheet2Data, targetCat, pivotModelGroups, inventoryMap
 
     // 맨 하단 총합계
     const pTotalRow = ws.getRow(pRow);
-    const totalBg2 = 'FF2D2B8E';
+    const totalBg2 = 'FF555555';
     applyCell(pTotalRow.getCell(pivotStartCol), {
       value: '총 합계', bold: true, fontSize: 10, bgColor: totalBg2, fontColor: COLORS.headerFont, hAlign: 'center', border: true
     });
