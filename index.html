@@ -148,7 +148,7 @@
               <input type="file" id="file-managermap" accept=".xlsx" class="file-input">
               <i data-lucide="users" class="upload-icon"></i>
               <h3>담당자-매출처표</h3>
-              <p class="file-desc">담당자매출처.xlsx</p>
+              <p class="file-desc">A 매출처 · B 담당자 · C 순위 · D 상품군<br>특판 매출은 상품군 담당자에게 자동 합산됩니다.</p>
               <div class="file-status" id="status-managermap">대기 중...</div>
             </div>
             <!-- 쿠팡로켓 (선택) -->
@@ -312,7 +312,7 @@
   </div>
 
   <script src="sample_generator.js"></script>
-  <script src="app.js?v=2"></script>
+  <script src="app.js?v=3"></script>
   <script>
     lucide.createIcons();
 
@@ -510,11 +510,13 @@
     }
 
     // ── 담당자-매출처 매핑표 파싱 ──
-    // 형식: A열=담당자, B열=매출처, C열=순위 (1행은 헤더)
+    // 형식: A열=매출처, B열=담당자, C열=순위, D열=상품군 (1행은 헤더)
+    let managerCategoryMap = {};
     let managerClientMap = {}; // { '홍길동': ['무신사', '29CM'], ... }
     let clientRankMap = {};    // { '무신사': 1, '29CM': 2, ... }
 
     async function parseManagerMap(buffer) {
+      managerCategoryMap = {};
       managerClientMap = {};
       clientRankMap = {};
       const wb = new ExcelJS.Workbook();
@@ -522,11 +524,12 @@
       const sheet = wb.worksheets[0];
 
       // 헤더에서 열 인덱스 자동 탐지
-      let mgrCol = 1, clientCol = 2, rankCol = 3;
+      let mgrCol = 2, clientCol = 1, rankCol = 3, categoryCol = 4;
       const hRow = sheet.getRow(1);
       if (hRow) {
         hRow.eachCell({ includeEmpty: true }, (cell, colNum) => {
           const v = String(cell.value || '').trim();
+          if (v === '상품군' || v === '국내분류') categoryCol = colNum;
           if (v === '담당자' || v === '담당') mgrCol = colNum;
           if (v === '매출처' || v === '고객사') clientCol = colNum;
           if (v === '순위' || v === '우선순위' || v === '순서') rankCol = colNum;
@@ -539,6 +542,11 @@
         const client = String(row.getCell(clientCol).value || '').trim();
         const rank   = parseInt(row.getCell(rankCol).value, 10) || 9999;
 
+        if (mgr) {
+          if (!managerCategoryMap[mgr]) managerCategoryMap[mgr] = [];
+          const categories = String(getCellValue(row.getCell(categoryCol))).split(/[,，;；\n]+/).map(v => v.trim()).filter(Boolean);
+          managerCategoryMap[mgr] = [...new Set([...managerCategoryMap[mgr], ...categories])];
+        }
         if (!mgr || !client) return;
         if (!managerClientMap[mgr]) managerClientMap[mgr] = [];
         managerClientMap[mgr].push(client);
@@ -611,6 +619,7 @@
           managerName:     inputManager.value.trim() || '담당자',
           selectedClients: selected,
           clientRankMap:   clientRankMap,
+          managerCategoryMap,
           selectedCategories: getSelectedCategories()
         });
         generatedResult = result;

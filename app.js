@@ -205,7 +205,7 @@ function applyCell(cell, {
 // ──────────────────────────────────────────────
 // 메인 처리 함수
 // ──────────────────────────────────────────────
-async function processFilesAndGenerate({ startDate, endDate, managerName, selectedClients, clientRankMap, selectedCategories }) {
+async function processFilesAndGenerate({ startDate, endDate, managerName, selectedClients, clientRankMap, selectedCategories, managerCategoryMap = {} }) {
   if (!uploadedData.rawData || !uploadedData.topSales || !uploadedData.productMaster) {
     throw new Error('원본데이터, 매출TOP, Product_Master 파일을 모두 업로드해 주세요.');
   }
@@ -234,6 +234,10 @@ async function processFilesAndGenerate({ startDate, endDate, managerName, select
   }
 
   // ── 2. 전처리 ──
+  // 모델명은 빈 셀을 이전 상품으로 채우지 않도록 원본 값을 유지합니다.
+  const rawModelCol = findColumnIndex(rawSheet, ['모델명', '모델', '품번', '모델그룹'], 0);
+  const rawModels = new Map();
+  if (rawModelCol) rawSheet.eachRow((row, n) => rawModels.set(n, getCellValue(row.getCell(rawModelCol))));
   cleanSheetData(rawSheet);
   cleanSheetData(topSheet);
 
@@ -252,8 +256,8 @@ async function processFilesAndGenerate({ startDate, endDate, managerName, select
   const topQtyCol        = findColumnIndex(topSheet, ['판매수량', '매출수량', '수량'], 4);
   const topAmountCol     = findColumnIndex(topSheet, ['매출금액', '매출액', '판매금액', '금액'], 5);
 
-  const pmCatCol         = 6; // F열: 국내분류
-  const pmModelGroupCol  = 7; // G열: 모델그룹
+  const pmCatCol         = findColumnIndex(masterSheet, ['국내분류', '상품군'], 6);// // F열: 국내분류
+  const pmModelGroupCol  = findColumnIndex(masterSheet, ['모델그룹'], 7);// // G열: 모델그룹
 
   // 재고 파일
   const invModelCol = 1; // A열
@@ -266,15 +270,40 @@ async function processFilesAndGenerate({ startDate, endDate, managerName, select
   // ── 3. Product_Master 파싱 ──
   const productCategoryMap = {}; // 모델그룹명(하이픈 이후 텍스트) → 국내분류
   const categoryToModelsMap = {}; // 국내분류 → 모든 모델그룹명(set) (판매량 0인 것도 포함하기 위함)
+  const modelCategories = new Map();
+  const modelKey = value => String(value || '').trim().toUpperCase();
+  const pmModelCol = findColumnIndex(masterSheet, ['모델명', '모델', '품번'], 1);
+  function addModelCategory(value, cat) {
+    const key = modelKey(value);
+    if (!key) return;
+    if (!modelCategories.has(key)) modelCategories.set(key, new Set());
+    modelCategories.get(key).add(cat);
+  }
+  function categoryForModel(value) {
+    const key = modelKey(value);
+    // 정확한 모델명 우선, 색상/사이즈가 붙은 경우 모델그룹으로 확인
+    const parts = key.split('-');
+    const keys = [key, parts.slice(0, 2).join('-'), parts[1], parts[0]];
+    for (const candidate of keys) {
+      const cats = modelCategories.get(candidate);
+      if (cats) return cats.size === 1 ? [...cats][0] : null;
+    }
+    return null;
+  }
   masterSheet.eachRow((row, rowNum) => {
     if (rowNum === 1) return;
     let modelGroup = String(getCellValue(row.getCell(pmModelGroupCol))).trim();
     const cat      = String(getCellValue(row.getCell(pmCatCol))).trim();
+    if (cat) {
+      addModelCategory(getCellValue(row.getCell(pmModelCol)), cat);
+      addModelCategory(modelGroup, cat);
+    }
     if (modelGroup && cat) {
       const dashIdx = modelGroup.indexOf('-');
       if (dashIdx !== -1) {
         modelGroup = modelGroup.substring(dashIdx + 1).trim();
       }
+      addModelCategory(modelGroup, cat);
       productCategoryMap[modelGroup] = cat;
       if (!categoryToModelsMap[cat]) categoryToModelsMap[cat] = new Set();
       categoryToModelsMap[cat].add(modelGroup);
@@ -314,6 +343,9 @@ async function processFilesAndGenerate({ startDate, endDate, managerName, select
   const end   = new Date(endDate);   end.setHours(23, 59, 59, 999);
 
   // { client: { orderNos: Set, qty, amount } }
+  const specialClient = '특판_영업1팀';
+  const ownedCategories = new Set(managerCategoryMap[managerName] || []);
+  const specialIssues = [];
   const clientMap = {};
   let skippedStatus = 0, skippedDate = 0, passedRows = 0;
 
@@ -334,6 +366,19 @@ async function processFilesAndGenerate({ startDate, endDate, managerName, select
 
     const client  = String(getCellValue(row.getCell(rawClientCol))).trim();
     if (!client || client === 'null') return;
+    if (client === specialClient) {
+      if (!Object.keys(managerCategoryMap).length || !managerName) {
+        throw new Error('특판 매출 배분을 위해 담당자매출처 파일(A 매출처 / B 담당자 / C 순위 / D 상품군)과 담당자 이름을 확인해 주세요.');
+      }
+      const model = rawModels.get(rowNum);
+      const cat = categoryForModel(model);
+      const owners = cat ? Object.keys(managerCategoryMap).filter(name => managerCategoryMap[name].includes(cat)) : [];
+      if (!cat || owners.length !== 1) {
+        specialIssues.push(`${rowNum}행: ${model || '모델명 없음'} (${!cat ? 'Product Master 상품군 확인 필요' : owners.length ? '상품군 담당자 중복' : '상품군 담당자 없음'})`);
+        return;
+      }
+      if (!ownedCategories.has(cat)) return;
+    }
 
     const orderNo   = String(getCellValue(row.getCell(rawOrderCol))).trim();
     const qty       = parseFloat(getCellValue(row.getCell(rawQtyCol)))    || 0;
@@ -350,6 +395,13 @@ async function processFilesAndGenerate({ startDate, endDate, managerName, select
 
   console.log(`[DEBUG] 원본데이터 처리: 상태제외=${skippedStatus}, 날짜제외=${skippedDate}, 통과=${passedRows}`);
   console.log('[DEBUG] 매출처 목록:', Object.keys(clientMap));
+
+  if (specialIssues.length) {
+    throw new Error('특판 매출의 담당자를 확정할 수 없습니다. 자료를 수정한 뒤 다시 실행해 주세요.\n' + specialIssues.slice(0, 10).join('\n'));
+  }
+  // 특판은 매출처 체크 여부와 관계없이 해당 상품군 담당자에게 한 번만 포함
+  selectedClients = [...new Set(selectedClients.filter(c => c !== specialClient))];
+  if (clientMap[specialClient]) selectedClients.push(specialClient);
 
   // 선택된 매출처만 필터링
   const sheet1Rows = selectedClients
